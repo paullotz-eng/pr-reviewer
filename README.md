@@ -1,0 +1,29 @@
+# pr-reviewer
+
+Local web app: list open PRs → click one → Claude reviews it → click a suggested
+[Conventional Comment](https://conventionalcomments.org) to post it on the PR.
+
+Requires `gh` (authenticated) and `claude` on your PATH. No Go dependencies.
+
+```sh
+go build -o pr-reviewer . && ./pr-reviewer             # PRs where your review is requested
+./pr-reviewer -repo eversport/eversports               # newest open PRs in one repo
+./pr-reviewer -model opus -limit 50 -addr 127.0.0.1:7777 -no-open
+./pr-reviewer -team eversport/guild-react                # tag a different team's PRs
+```
+
+- **Search:** typing filters the list (title, author, repo, number). Enter runs a
+  GitHub search within `-repo`, or the team's org. Qualifiers like `author:x` work.
+- **Team tags:** PRs by members of `-team` get a `team` tag, yours get `you`.
+  "Only my team" hides the rest.
+- **React conventions:** if a PR touches `.tsx`/`.jsx`/`use-*.ts`, the
+  `.claude/skills/react-conventions/SKILL.md` from the PR's base branch is added
+  to the review (falls back to `-skill-file`). Only important violations are
+  flagged, tagged with the `conventions` decoration.
+
+- Comments are sorted by severity (critical → info), then importance (10 → 1).
+- Comments with a file/line are posted as inline review comments on the PR head
+  commit. If GitHub rejects the line, it falls back to a normal PR comment
+  prefixed with `file:line`.
+- Reviews and posted state are cached in memory until restart. "Re-run review"
+  forces a fresh review.
