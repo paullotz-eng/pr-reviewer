@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -45,7 +46,7 @@ const reviewSchema = `{
       "type": "object",
       "required": ["label", "decorations", "subject", "discussion", "severity", "importance", "file", "line"],
       "properties": {
-        "label": {"type": "string", "enum": ["praise", "nitpick", "suggestion", "issue", "todo", "question", "thought", "chore", "note"]},
+        "label": {"type": "string", "enum": ["nitpick", "suggestion", "issue", "todo", "question", "thought", "chore", "note"]},
         "decorations": {"type": "array", "items": {"type": "string"}},
         "subject": {"type": "string"},
         "discussion": {"type": "string"},
@@ -58,27 +59,10 @@ const reviewSchema = `{
   }
 }`
 
-const systemPrompt = `You are a senior software engineer doing a pragmatic code review of a GitHub pull request.
-
-Write every comment in Conventional Comments format (https://conventionalcomments.org):
-- label: praise | nitpick | suggestion | issue | todo | question | thought | chore | note
-- decorations: usually exactly one of "blocking", "non-blocking", "if-minor"; optionally add a topic like "security", "performance", "tests", "readability"
-- subject: one concise sentence, the main point
-- discussion: the reasoning and, where useful, a concrete fix. You may include a GitHub suggestion block (` + "```suggestion" + `) only if it replaces exactly the commented line.
-
-Severity: critical (bugs, data loss, security holes) > high (likely bugs, broken edge cases, missing error handling) > medium (design, maintainability, missing tests) > low (style, naming) > info (praise, questions, FYIs).
-Importance: 1-10, how much the author should care, used to order comments of equal severity.
-
-Location: the diff is annotated with new-file line numbers in the left column. Set "file" to the path after "b/" and "line" to that number. Only reference lines that have a number (added or context lines). For PR-wide comments use file "" and line 0.
-
-Keep it short and insightful. Hard limits:
-- summary: max 30 words. What the PR does and whether it is safe to merge.
-- subject: max 15 words.
-- discussion: max 35 words (code snippets excluded). State the problem and the fix; nothing else.
-- No filler, hedging, restating the diff or PR description, or generic advice ("consider adding tests" without saying which).
-- Only comment on things that matter. Skip trivia a linter or formatter would catch, and do not invent problems. Fewer, sharper comments beat many weak ones. At most one praise comment, only when deserved.
-- If the same problem appears in several places, write one comment and list the other locations.
-Write like a sharp colleague, not a robot.`
+// systemPrompt is the reviewer's instructions; edit prompt.md and rebuild.
+//
+//go:embed prompt.md
+var systemPrompt string
 
 const conventionsPrompt = `
 

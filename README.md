@@ -27,3 +27,5 @@ go build -o pr-reviewer . && ./pr-reviewer             # PRs where your review i
   prefixed with `file:line`.
 - Reviews and posted state are cached in memory until restart. "Re-run review"
   forces a fresh review.
+- The reviewer instructions live in `prompt.md` (embedded at build time). Edit and rebuild
+  to tune the review style.
