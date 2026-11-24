@@ -15,6 +15,11 @@
   h1 img { width:32px; height:32px; image-rendering:pixelated; }
   button { background:var(--panel); color:var(--fg); border:1px solid var(--border); border-radius:6px; padding:4px 10px; cursor:pointer; font:inherit; }
   button:hover { border-color:var(--muted); }
+  #usage { padding:6px 16px; border-bottom:1px solid var(--border); color:var(--muted); font-size:12px; display:flex; gap:14px; }
+  #usage:empty { display:none; }
+  #usage .bar { display:inline-block; width:50px; height:6px; background:var(--panel); border:1px solid var(--border); border-radius:3px; margin:0 4px; vertical-align:middle; overflow:hidden; }
+  #usage .bar i { display:block; height:100%; background:#3fb950; }
+  #usage .warn i { background:#e3b341; } #usage .crit i { background:#f85149; }
   .pr { padding:10px 16px; border-bottom:1px solid var(--border); cursor:pointer; }
   .pr:hover { background:var(--panel); }
   .pr.active { background:var(--panel); box-shadow:inset 3px 0 var(--accent); }
@@ -85,6 +90,7 @@
 <body>
 <aside>
   <header><h1><img src="/favicon.svg" alt="">Open pull requests</h1><button id="refresh">Refresh</button></header>
+  <div id="usage" title="Claude plan usage, as reported by the last claude call"></div>
   <div class="search">
     <input type="search" id="q" placeholder="Filter… (Enter to search GitHub)" autocomplete="off">
     <label><input type="checkbox" id="teamOnly"> Only my team</label>
@@ -165,7 +171,8 @@ async function review(pr, force = false) {
 
   let rev;
   try { rev = await api('/api/review', { repo: pr.repo, number: pr.number, force }); }
-  catch (e) { if (current === pr) main.replaceChildren(head, h('p', 'error', e.message)); return; }
+  catch (e) { loadUsage(); if (current === pr) main.replaceChildren(head, h('p', 'error', e.message)); return; }
+  loadUsage();
   if (current !== pr) return;
 
   const rerun = h('button', null, 'Re-run review'); rerun.style.marginLeft = '12px';
@@ -298,13 +305,34 @@ function submitPanel(pr, rev, selected) {
   return { el, update };
 }
 
+// Plan usage is only known after a claude call, so it can lag behind.
+async function loadUsage() {
+  const el = $('#usage');
+  let u;
+  try { u = await api('/api/usage'); } catch { return; }
+  const names = { five_hour: '5h', seven_day: 'week' };
+  const now = Date.now() / 1000;
+  el.replaceChildren(...Object.entries(u.windows ?? {}).map(([k, w]) => {
+    const reset = w.resetsAt <= now;
+    const pct = reset ? 0 : Math.round(w.utilization * 100);
+    const when = new Date(w.resetsAt * 1000);
+    const span = h('span');
+    span.title = reset ? 'window has reset since last check' :
+      `${pct}% used, resets ${when.toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`;
+    const bar = h('span', 'bar' + (pct >= 90 ? ' crit' : pct >= 70 ? ' warn' : ''));
+    const fill = h('i'); fill.style.width = pct + '%'; bar.append(fill);
+    span.append(names[k] ?? k, bar, `${100 - pct}% left`);
+    return span;
+  }));
+}
+
 $('#refresh').onclick = () => { $('#q').value = ''; loadPRs(); };
 $('#q').oninput = renderPRs;
 $('#q').onkeydown = (e) => { if (e.key === 'Enter') loadPRs($('#q').value.trim()); };
 $('#teamOnly').onchange = renderPRs;
-loadPRs();
+loadPRs(); loadUsage();
 // Pick up new PRs and background reviews, unless a GitHub search is shown.
-setInterval(() => { if (!searched && document.visibilityState === 'visible') loadPRs('', true); }, 60_000);
+setInterval(() => { if (!searched && document.visibilityState === 'visible') { loadPRs('', true); loadUsage(); } }, 60_000);
 </script>
 </body>
 </html>

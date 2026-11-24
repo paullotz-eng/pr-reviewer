@@ -54,6 +54,7 @@ func main() {
 		log.Fatalf("-cc-style must be badge or plain, got %q", *ccStyle)
 	}
 	opts := Options{Model: *model, Conventions: *conventions, ConventionsFile: *conventionsFile, ClonesRoot: *clonesRoot, PlainCC: *ccStyle == "plain"}
+	opts.Usage = loadUsage(filepath.Join(filepath.Dir(*storePath), "usage.json"))
 
 	startCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	me, err := currentUser(startCtx)
@@ -135,6 +136,10 @@ func main() {
 			prs[i].Status, prs[i].StatusKind = reviewStatus(st.get(key), runs.isRunning(key))
 		}
 		reply(w, prs, err)
+	})
+
+	mux.HandleFunc("GET /api/usage", func(w http.ResponseWriter, r *http.Request) {
+		reply(w, opts.Usage.get(), nil)
 	})
 
 	mux.HandleFunc("POST /api/review", func(w http.ResponseWriter, r *http.Request) {

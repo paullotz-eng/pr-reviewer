@@ -53,6 +53,10 @@ conventions-file = /path/to/local/frontend-conventions.md
   "refuted by the challenger" to see them), unresolved ones become non-blocking,
   and the verdict drops from request changes to comment if nothing blocks anymore.
 
+- **Plan usage:** the sidebar shows how much of your Claude 5-hour and weekly
+  limits is left, as reported by the last `claude` call (hover for the reset
+  time). It updates after each review and is kept across restarts.
+
 - **Comment format:** matches the [Pullpo Conventional Comments extension](https://github.com/pullpo-io/conventional-comments)
   the team uses, so posted comments look the same as hand-written ones and the
   extension recognises them: its badge style by default, or

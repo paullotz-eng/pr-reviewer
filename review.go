@@ -50,10 +50,11 @@ type Review struct {
 
 type Options struct {
 	Model           string
-	Conventions     string // path of the conventions doc inside the PR's repo ("" = off)
-	ConventionsFile string // local fallback for it
-	PlainCC         bool   // plain "issue(blocking): subject" instead of badges
-	ClonesRoot      string // directory holding local clones, for codebase access
+	Conventions     string        // path of the conventions doc inside the PR's repo ("" = off)
+	ConventionsFile string        // local fallback for it
+	PlainCC         bool          // plain "issue(blocking): subject" instead of badges
+	ClonesRoot      string        // directory holding local clones, for codebase access
+	Usage           *usageTracker // records plan usage reported by claude (nil = off)
 }
 
 const reviewSchema = `{
@@ -225,7 +226,8 @@ func runReview(ctx context.Context, o Options, repo string, n int) (*Review, err
 // claude runs one headless Claude call and returns its structured output.
 // With tools, it can read the checkout in dir; without, it sees only the prompt.
 func claude(ctx context.Context, o Options, dir string, tools bool, system, prompt, schema string) (json.RawMessage, error) {
-	args := []string{"-p", "--output-format", "json", "--json-schema", schema,
+	// stream-json (needs --verbose) also carries rate_limit_event lines with plan usage.
+	args := []string{"-p", "--output-format", "stream-json", "--verbose", "--json-schema", schema,
 		"--strict-mcp-config", "--disable-slash-commands", "--system-prompt", system}
 	if o.Model != "" {
 		args = append(args, "--model", o.Model)
@@ -244,16 +246,25 @@ func claude(ctx context.Context, o Options, dir string, tools bool, system, prom
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("claude: %v: %s %s", err, strings.TrimSpace(stderr.String()), truncate(string(out), 500))
-	}
+	lines := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
+	o.Usage.record(lines)
 	var res struct {
+		Type             string          `json:"type"`
 		IsError          bool            `json:"is_error"`
 		Result           string          `json:"result"`
 		StructuredOutput json.RawMessage `json:"structured_output"`
 	}
-	if err := json.Unmarshal(out, &res); err != nil {
-		return nil, fmt.Errorf("parse claude output: %v", err)
+	for i := len(lines) - 1; i >= 0; i-- {
+		if json.Unmarshal(lines[i], &res) == nil && res.Type == "result" {
+			break
+		}
+		res.Type = ""
+	}
+	if err != nil {
+		return nil, fmt.Errorf("claude: %v: %s %s", err, strings.TrimSpace(stderr.String()), truncate(res.Result, 500))
+	}
+	if res.Type != "result" {
+		return nil, fmt.Errorf("parse claude output: no result in %s", truncate(string(out), 500))
 	}
 	if res.IsError || len(res.StructuredOutput) == 0 || string(res.StructuredOutput) == "null" {
 		return nil, fmt.Errorf("claude returned no structured output: %s", truncate(res.Result, 500))
