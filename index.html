@@ -16,7 +16,6 @@
   button { background:var(--panel); color:var(--fg); border:1px solid var(--border); border-radius:6px; padding:4px 10px; cursor:pointer; font:inherit; }
   button:hover { border-color:var(--muted); }
   #usage { padding:6px 16px; border-bottom:1px solid var(--border); color:var(--muted); font-size:12px; display:flex; gap:14px; }
-  #usage:empty { display:none; }
   #usage .bar { display:inline-block; width:50px; height:6px; background:var(--panel); border:1px solid var(--border); border-radius:3px; margin:0 4px; vertical-align:middle; overflow:hidden; }
   #usage .bar i { display:block; height:100%; background:#3fb950; }
   #usage .warn i { background:#e3b341; } #usage .crit i { background:#f85149; }
@@ -309,7 +308,8 @@ function submitPanel(pr, rev, selected) {
 async function loadUsage() {
   const el = $('#usage');
   let u;
-  try { u = await api('/api/usage'); } catch { return; }
+  try { u = await api('/api/usage'); } catch { el.textContent = 'Claude usage: unavailable'; return; }
+  if (!u.windows) { el.textContent = 'Claude usage: checking…'; return; }
   const names = { five_hour: '5h', seven_day: 'week' };
   const now = Date.now() / 1000;
   el.replaceChildren(...Object.entries(u.windows ?? {}).map(([k, w]) => {
@@ -331,6 +331,8 @@ $('#q').oninput = renderPRs;
 $('#q').onkeydown = (e) => { if (e.key === 'Enter') loadPRs($('#q').value.trim()); };
 $('#teamOnly').onchange = renderPRs;
 loadPRs(); loadUsage();
+// The startup probe takes a few seconds; check again until it has landed.
+const firstUsage = setInterval(async () => { await loadUsage(); if ($('#usage .bar')) clearInterval(firstUsage); }, 3000);
 // Pick up new PRs and background reviews, unless a GitHub search is shown.
 setInterval(() => { if (!searched && document.visibilityState === 'visible') { loadPRs('', true); loadUsage(); } }, 60_000);
 </script>

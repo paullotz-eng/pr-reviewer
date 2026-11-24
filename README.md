@@ -59,7 +59,8 @@ conventions-file = /path/to/local/frontend-conventions.md
 
 - **Plan usage:** the sidebar shows how much of your Claude 5-hour and weekly
   limits is left, as reported by the last `claude` call (hover for the reset
-  time). It updates after each review and is kept across restarts.
+  time). It is read once at startup with a tiny haiku call, then updated after
+  each review, and kept across restarts.
 
 - **Comment format:** matches the [Pullpo Conventional Comments extension](https://github.com/pullpo-io/conventional-comments)
   the team uses, so posted comments look the same as hand-written ones and the

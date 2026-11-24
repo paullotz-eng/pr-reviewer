@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -72,5 +74,16 @@ func (t *usageTracker) record(lines [][]byte) {
 	if b, err := json.Marshal(t.u); err == nil {
 		os.MkdirAll(filepath.Dir(t.path), 0o755)
 		os.WriteFile(t.path, b, 0o644)
+	}
+}
+
+// probe makes one tiny claude call so plan usage is known before the first review.
+func (t *usageTracker) probe(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	_, err := claude(ctx, Options{Model: "haiku", Usage: t}, os.TempDir(), false,
+		"Reply with ok.", "ok", `{"type":"object","required":["ok"],"properties":{"ok":{"type":"string"}}}`)
+	if err != nil {
+		log.Printf("usage probe: %v", err)
 	}
 }

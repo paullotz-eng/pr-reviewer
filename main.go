@@ -77,6 +77,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go cleanStaleCheckouts(os.TempDir(), 20*time.Minute)
+	go opts.Usage.probe(ctx)
 
 	st := loadStore(*storePath)
 	runs := &runner{running: map[string]*call{}}
