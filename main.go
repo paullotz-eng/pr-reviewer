@@ -38,7 +38,7 @@ func main() {
 		"local react-conventions skill, used if the PR's repo has none")
 	storePath := flag.String("store", filepath.Join(cacheDir, "pr-reviewer", "reviews.json"), "file that keeps reviews across restarts")
 	noOpen := flag.Bool("no-open", false, "don't open the browser")
-	watch := flag.Duration("watch", 5*time.Minute, "how often to check for new PRs by -team members and review them automatically (0 disables)")
+	watch := flag.Duration("watch", 10*time.Minute, "how often to check for new PRs by -team members and review them automatically (0 disables)")
 	flag.Parse()
 	opts := Options{Model: *model, SkillFile: *skillFile, ClonesRoot: *clonesRoot}
 

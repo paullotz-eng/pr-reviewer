@@ -23,7 +23,7 @@ go build -o pr-reviewer . && ./pr-reviewer             # PRs where your review i
 
 - **Linked issues:** issues the PR closes (`Closes #123`) are loaded so the
   reviewer can check the PR against their acceptance criteria.
-- **Watch mode:** every 5 minutes (`-watch 2m` to change, `-watch 0` to turn
+- **Watch mode:** every 10 minutes (`-watch 2m` to change, `-watch 0` to turn
   off) the app checks for open, non-draft PRs by `-team` members (not you) in
   `-repo`, or else the team's org. New ones are reviewed in the background, one
   at a time, and you get a desktop notification with the verdict. Nothing is
