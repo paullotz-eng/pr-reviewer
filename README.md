@@ -1,3 +1,5 @@
+<p align="center"><img src="avatar.svg" width="128" alt="pr-reviewer owl"></p>
+
 # pr-reviewer
 
 Local web app: list open PRs → click one → Claude reviews it → click a suggested
