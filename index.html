@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>PR Reviewer</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   :root { --bg:#0d1117; --panel:#161b22; --border:#30363d; --fg:#e6edf3; --muted:#8b949e; --accent:#2f81f7; }
   * { box-sizing: border-box; }
@@ -10,7 +11,8 @@
   aside { border-right:1px solid var(--border); overflow-y:auto; }
   main { overflow-y:auto; padding:20px 28px; }
   header { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:var(--bg); }
-  h1 { font-size:15px; margin:0; }
+  h1 { font-size:15px; margin:0; display:flex; align-items:center; gap:8px; }
+  h1 img { width:32px; height:32px; image-rendering:pixelated; }
   button { background:var(--panel); color:var(--fg); border:1px solid var(--border); border-radius:6px; padding:4px 10px; cursor:pointer; font:inherit; }
   button:hover { border-color:var(--muted); }
   .pr { padding:10px 16px; border-bottom:1px solid var(--border); cursor:pointer; }
@@ -73,7 +75,7 @@
 </head>
 <body>
 <aside>
-  <header><h1>Open pull requests</h1><button id="refresh">Refresh</button></header>
+  <header><h1><img src="/favicon.svg" alt="">Open pull requests</h1><button id="refresh">Refresh</button></header>
   <div class="search">
     <input type="search" id="q" placeholder="Filter… (Enter to search GitHub)" autocomplete="off">
     <label><input type="checkbox" id="teamOnly"> Only my team</label>

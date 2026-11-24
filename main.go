@@ -25,6 +25,9 @@ import (
 //go:embed index.html
 var indexHTML []byte
 
+//go:embed avatar.svg
+var avatarSVG []byte
+
 func main() {
 	home, _ := os.UserHomeDir()
 	cacheDir, _ := os.UserCacheDir()
@@ -93,6 +96,11 @@ func main() {
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(indexHTML)
+	})
+
+	mux.HandleFunc("GET /favicon.svg", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Write(avatarSVG)
 	})
 
 	mux.HandleFunc("GET /api/prs", func(w http.ResponseWriter, r *http.Request) {
