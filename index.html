@@ -31,8 +31,11 @@
   details.rejected { margin-top:20px; color:var(--muted); }
   details.rejected summary { cursor:pointer; margin-bottom:8px; }
   details.rejected .comment { opacity:.6; }
-  .tag.rev { background:none; color:var(--muted); border:1px solid var(--border); font-weight:400; }
-  .tag.rev.request_changes { color:#f85149; border-color:#f85149; } .tag.rev.approve { color:#3fb950; border-color:#238636; } .tag.rev.comment { color:#d29922; border-color:#9e6a03; }
+  .pr .meta { display:flex; gap:8px; align-items:center; }
+  .status-tag { margin-left:auto; white-space:nowrap; font-size:11px; border-radius:10px; padding:0 6px; border:1px solid var(--border); color:var(--muted); }
+  .status-tag.blocking { color:#f85149; border-color:#f85149; }
+  .status-tag.comments { color:#d29922; border-color:#9e6a03; }
+  .status-tag.clean, .status-tag.posted { color:#3fb950; border-color:#238636; }
   .search { padding:10px 16px; border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:6px; }
   .search input[type=search] { width:100%; background:var(--panel); color:var(--fg); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font:inherit; }
   .search input[type=search]:focus { outline:none; border-color:var(--accent); }
@@ -127,8 +130,14 @@ function renderPRs() {
     if (pr.mine) title.append(h('span', 'tag you', 'you'));
     else if (pr.team) title.append(h('span', 'tag team', 'team'));
     if (pr.isDraft) title.append(h('span', 'draft', 'draft'));
-    if (pr.review) title.append(h('span', 'tag rev ' + pr.review, pr.review === 'running' ? 'reviewing…' : 'reviewed: ' + pr.review.replace('_', ' ')));
-    el.append(title, h('div', 'meta', `${pr.repo}#${pr.number} · @${pr.author} · ${ago(pr.createdAt)}`));
+    const meta = h('div', 'meta');
+    meta.append(h('span', null, `${pr.repo}#${pr.number} · @${pr.author} · ${ago(pr.createdAt)}`));
+    if (pr.status) {
+      const tag = h('span', 'status-tag ' + pr.statusKind, pr.status);
+      tag.title = pr.statusKind === 'running' ? 'Claude is reviewing this PR' : 'Stored review: click the PR to open it';
+      meta.append(tag);
+    }
+    el.append(title, meta);
     el.onclick = () => { document.querySelectorAll('.pr.active').forEach(e => e.classList.remove('active')); el.classList.add('active'); review(pr); };
     list.append(el);
   }

@@ -19,9 +19,12 @@ type PR struct {
 	CreatedAt time.Time `json:"createdAt"`
 	URL       string    `json:"url"`
 	IsDraft   bool      `json:"isDraft"`
-	Team      bool      `json:"team"`             // author is in your team
-	Mine      bool      `json:"mine"`             // author is you
-	Review    string    `json:"review,omitempty"` // "running", or the stored review's verdict
+	Team      bool      `json:"team"` // author is in your team
+	Mine      bool      `json:"mine"` // author is you
+	// Review status for the list: Status is the text, StatusKind picks the colour
+	// (running, blocking, comments, clean, posted). Empty when not reviewed.
+	Status     string `json:"status,omitempty"`
+	StatusKind string `json:"statusKind,omitempty"`
 }
 
 type PRDetails struct {

@@ -103,11 +103,7 @@ func main() {
 			prs[i].Mine = prs[i].Author == me
 			prs[i].Team = members[prs[i].Author]
 			key := prKey(prs[i].Repo, prs[i].Number)
-			if runs.isRunning(key) {
-				prs[i].Review = "running"
-			} else if rev := st.get(key); rev != nil {
-				prs[i].Review = rev.Verdict
-			}
+			prs[i].Status, prs[i].StatusKind = reviewStatus(st.get(key), runs.isRunning(key))
 		}
 		reply(w, prs, err)
 	})

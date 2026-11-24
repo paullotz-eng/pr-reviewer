@@ -246,3 +246,25 @@ func TestRenderCommentMatchesPullpo(t *testing.T) {
 		t.Errorf("location must not precede the prefix: %q", got)
 	}
 }
+
+func TestReviewStatus(t *testing.T) {
+	cases := []struct {
+		name     string
+		rev      *Review
+		running  bool
+		text     string
+		wantKind string
+	}{
+		{"not reviewed", nil, false, "", ""},
+		{"running", nil, true, "reviewing…", "running"},
+		{"clean", &Review{}, false, "looks good", "clean"},
+		{"one", &Review{Comments: []Comment{{}}}, false, "1 comment", "comments"},
+		{"blocking", &Review{Comments: []Comment{{Decoration: "blocking"}, {}, {Decoration: "blocking"}}}, false, "2 blocking", "blocking"},
+		{"posted", &Review{Comments: []Comment{{Decoration: "blocking"}, {PostedURL: "u"}}}, false, "✓ posted", "posted"},
+	}
+	for _, c := range cases {
+		if text, kind := reviewStatus(c.rev, c.running); text != c.text || kind != c.wantKind {
+			t.Errorf("%s: got %q/%q, want %q/%q", c.name, text, kind, c.text, c.wantKind)
+		}
+	}
+}

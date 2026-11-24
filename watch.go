@@ -6,6 +6,7 @@ import (
 	"log"
 	"os/exec"
 	"runtime"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -134,5 +135,33 @@ func notify(title, body string) {
 	}
 	if err := cmd.Run(); err != nil {
 		log.Printf("notify: %v", err)
+	}
+}
+
+// reviewStatus summarises a PR's review for the list.
+func reviewStatus(rev *Review, running bool) (text, kind string) {
+	switch {
+	case running:
+		return "reviewing…", "running"
+	case rev == nil:
+		return "", ""
+	case slices.ContainsFunc(rev.Comments, func(c Comment) bool { return c.PostedURL != "" }):
+		return "✓ posted", "posted"
+	}
+	blocking := 0
+	for _, c := range rev.Comments {
+		if c.Decoration == "blocking" {
+			blocking++
+		}
+	}
+	switch n := len(rev.Comments); {
+	case blocking > 0:
+		return fmt.Sprintf("%d blocking", blocking), "blocking"
+	case n == 0:
+		return "looks good", "clean"
+	case n == 1:
+		return "1 comment", "comments"
+	default:
+		return fmt.Sprintf("%d comments", n), "comments"
 	}
 }
