@@ -53,6 +53,10 @@ conventions-file = /path/to/local/frontend-conventions.md
   "refuted by the challenger" to see them), unresolved ones become non-blocking,
   and the verdict drops from request changes to comment if nothing blocks anymore.
 
+- **Signature:** every comment and review posted ends with a small owl and
+  "Posted with pr-reviewer", linking to this repo. It is added when posting,
+  so it doesn't appear in the editor.
+
 - **Plan usage:** the sidebar shows how much of your Claude 5-hour and weekly
   limits is left, as reported by the last `claude` call (hover for the reset
   time). It updates after each review and is kept across restarts.

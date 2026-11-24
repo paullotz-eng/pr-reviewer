@@ -304,19 +304,25 @@ func locate(file string, line int, body string) string {
 	return fmt.Sprintf("%s\n\n`%s:%d`", body, file, line)
 }
 
+// signature closes every comment posted to GitHub, so readers can tell it came
+// from this tool. Added at posting time, so it never shows up in the editor.
+const signature = `<sub><a href="https://github.com/paullotz-eng/pr-reviewer"><img src="https://raw.githubusercontent.com/paullotz-eng/pr-reviewer/main/avatar.svg" width="16" height="16" align="absmiddle" alt="owl"></a> Posted with [pr-reviewer](https://github.com/paullotz-eng/pr-reviewer)</sub>`
+
+func sign(body string) string { return body + "\n\n" + signature }
+
 // postComment posts a single comment: inline when the line is in the diff,
 // otherwise (or if GitHub rejects it) as a regular PR comment.
 func postComment(ctx context.Context, repo string, n int, commitID string, c Comment) (string, error) {
 	if c.Inline && commitID != "" {
 		payload, _ := json.Marshal(map[string]any{
-			"body": c.Body, "commit_id": commitID, "path": c.File, "line": c.Line, "side": "RIGHT",
+			"body": sign(c.Body), "commit_id": commitID, "path": c.File, "line": c.Line, "side": "RIGHT",
 		})
 		out, err := gh(ctx, payload, "api", "-X", "POST", fmt.Sprintf("repos/%s/pulls/%d/comments", repo, n), "--input", "-")
 		if err == nil {
 			return htmlURL(out), nil
 		}
 	}
-	out, err := gh(ctx, []byte(locate(c.File, c.Line, c.Body)), "pr", "comment", strconv.Itoa(n), "-R", repo, "--body-file", "-")
+	out, err := gh(ctx, []byte(sign(locate(c.File, c.Line, c.Body))), "pr", "comment", strconv.Itoa(n), "-R", repo, "--body-file", "-")
 	return strings.TrimSpace(string(out)), err
 }
 
@@ -336,13 +342,13 @@ func submitReview(ctx context.Context, repo string, n int, commitID, event, body
 	}
 	for _, c := range comments {
 		if c.Inline {
-			inline = append(inline, inlineComment{c.File, c.Line, "RIGHT", c.Body})
+			inline = append(inline, inlineComment{c.File, c.Line, "RIGHT", sign(c.Body)})
 		} else {
 			parts = append(parts, locate(c.File, c.Line, c.Body))
 		}
 	}
 	payload, _ := json.Marshal(map[string]any{
-		"commit_id": commitID, "event": event, "body": strings.Join(parts, "\n\n---\n\n"), "comments": inline,
+		"commit_id": commitID, "event": event, "body": sign(strings.Join(parts, "\n\n---\n\n")), "comments": inline,
 	})
 	out, err := gh(ctx, payload, "api", "-X", "POST", fmt.Sprintf("repos/%s/pulls/%d/reviews", repo, n), "--input", "-")
 	if err != nil {
