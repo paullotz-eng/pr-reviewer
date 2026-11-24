@@ -31,6 +31,8 @@
   details.rejected { margin-top:20px; color:var(--muted); }
   details.rejected summary { cursor:pointer; margin-bottom:8px; }
   details.rejected .comment { opacity:.6; }
+  .tag.rev { background:none; color:var(--muted); border:1px solid var(--border); font-weight:400; }
+  .tag.rev.request_changes { color:#f85149; border-color:#f85149; } .tag.rev.approve { color:#3fb950; border-color:#238636; } .tag.rev.comment { color:#d29922; border-color:#9e6a03; }
   .search { padding:10px 16px; border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:6px; }
   .search input[type=search] { width:100%; background:var(--panel); color:var(--fg); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font:inherit; }
   .search input[type=search]:focus { outline:none; border-color:var(--accent); }
@@ -93,14 +95,14 @@ function ago(iso) {
 
 let allPRs = [], searched = '';
 
-async function loadPRs(query = '') {
+async function loadPRs(query = '', quiet = false) {
   const list = $('#prs');
-  list.replaceChildren(h('p', 'empty', query ? `Searching GitHub for "${query}"…` : 'Loading…'));
+  if (!quiet) list.replaceChildren(h('p', 'empty', query ? `Searching GitHub for "${query}"…` : 'Loading…'));
   try {
     allPRs = await api('/api/prs?q=' + encodeURIComponent(query)) ?? [];
     searched = query;
     renderPRs();
-  } catch (e) { list.replaceChildren(h('p', 'error', e.message)); }
+  } catch (e) { if (!quiet) list.replaceChildren(h('p', 'error', e.message)); }
 }
 
 function renderPRs() {
@@ -121,6 +123,7 @@ function renderPRs() {
     if (pr.mine) title.append(h('span', 'tag you', 'you'));
     else if (pr.team) title.append(h('span', 'tag team', 'team'));
     if (pr.isDraft) title.append(h('span', 'draft', 'draft'));
+    if (pr.review) title.append(h('span', 'tag rev ' + pr.review, pr.review === 'running' ? 'reviewing…' : 'reviewed: ' + pr.review.replace('_', ' ')));
     el.append(title, h('div', 'meta', `${pr.repo}#${pr.number} · @${pr.author} · ${ago(pr.createdAt)}`));
     el.onclick = () => { document.querySelectorAll('.pr.active').forEach(e => e.classList.remove('active')); el.classList.add('active'); review(pr); };
     list.append(el);
@@ -205,6 +208,8 @@ $('#q').oninput = renderPRs;
 $('#q').onkeydown = (e) => { if (e.key === 'Enter') loadPRs($('#q').value.trim()); };
 $('#teamOnly').onchange = renderPRs;
 loadPRs();
+// Pick up new PRs and background reviews, unless a GitHub search is shown.
+setInterval(() => { if (!searched && document.visibilityState === 'visible') loadPRs('', true); }, 60_000);
 </script>
 </body>
 </html>

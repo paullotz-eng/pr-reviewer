@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 const sampleDiff = `diff --git a/src/app.ts b/src/app.ts
@@ -164,5 +165,48 @@ func TestApplyChallenge(t *testing.T) {
 	}
 	if r.Challenge != "challenger: 1 confirmed, 1 unresolved, 1 refuted" {
 		t.Errorf("challenge = %q", r.Challenge)
+	}
+}
+
+func TestWatcherDue(t *testing.T) {
+	now := time.Now()
+	w := &watcher{since: now.Add(-24 * time.Hour), me: "me", members: map[string]bool{"me": true, "ana": true},
+		known: func(key string) bool { return key == "o/r#2" }}
+	cases := []struct {
+		name string
+		pr   PR
+		want bool
+	}{
+		{"new team PR", PR{Repo: "o/r", Number: 1, Author: "ana", CreatedAt: now}, true},
+		{"already reviewed", PR{Repo: "o/r", Number: 2, Author: "ana", CreatedAt: now}, false},
+		{"outside team", PR{Repo: "o/r", Number: 3, Author: "bob", CreatedAt: now}, false},
+		{"my own PR", PR{Repo: "o/r", Number: 4, Author: "me", CreatedAt: now}, false},
+		{"draft", PR{Repo: "o/r", Number: 5, Author: "ana", CreatedAt: now, IsDraft: true}, false},
+		{"too old", PR{Repo: "o/r", Number: 6, Author: "ana", CreatedAt: now.Add(-48 * time.Hour)}, false},
+	}
+	for _, c := range cases {
+		if got := w.due(c.pr); got != c.want {
+			t.Errorf("%s: due = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestRunnerDedupes(t *testing.T) {
+	r := &runner{running: map[string]*call{}}
+	release, calls := make(chan struct{}), 0
+	done := make(chan *Review)
+	go func() {
+		rev, _ := r.do("k", func() (*Review, error) { calls++; <-release; return &Review{Verdict: "approve"}, nil })
+		done <- rev
+	}()
+	for !r.isRunning("k") {
+		time.Sleep(time.Millisecond)
+	}
+	go func() { rev, _ := r.do("k", func() (*Review, error) { calls++; return nil, nil }); done <- rev }()
+	time.Sleep(10 * time.Millisecond)
+	close(release)
+	a, b := <-done, <-done
+	if calls != 1 || a != b || a.Verdict != "approve" {
+		t.Errorf("calls = %d, results %v %v", calls, a, b)
 	}
 }

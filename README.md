@@ -23,6 +23,13 @@ go build -o pr-reviewer . && ./pr-reviewer             # PRs where your review i
 
 - **Linked issues:** issues the PR closes (`Closes #123`) are loaded so the
   reviewer can check the PR against their acceptance criteria.
+- **Watch mode:** every 5 minutes (`-watch 2m` to change, `-watch 0` to turn
+  off) the app checks for open, non-draft PRs by `-team` members (not you) in
+  `-repo`, or else the team's org. New ones are reviewed in the background, one
+  at a time, and you get a desktop notification with the verdict. Nothing is
+  posted. On startup it also catches PRs opened in the last 24h that have no
+  review yet. The PR list refreshes every minute and shows `reviewing…` or the
+  stored verdict.
 - **Challenger:** blocking, critical and high findings get a second, fresh
   Claude pass that tries to refute them. Refuted findings are hidden (expand
   "refuted by the challenger" to see them), unresolved ones become non-blocking,

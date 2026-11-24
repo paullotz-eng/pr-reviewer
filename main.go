@@ -38,6 +38,7 @@ func main() {
 		"local react-conventions skill, used if the PR's repo has none")
 	storePath := flag.String("store", filepath.Join(cacheDir, "pr-reviewer", "reviews.json"), "file that keeps reviews across restarts")
 	noOpen := flag.Bool("no-open", false, "don't open the browser")
+	watch := flag.Duration("watch", 5*time.Minute, "how often to check for new PRs by -team members and review them automatically (0 disables)")
 	flag.Parse()
 	opts := Options{Model: *model, SkillFile: *skillFile, ClonesRoot: *clonesRoot}
 
@@ -58,6 +59,31 @@ func main() {
 	cancel()
 
 	st := loadStore(*storePath)
+	runs := &runner{running: map[string]*call{}}
+	// reviewPR runs a review (or waits for the one already running) and stores it.
+	reviewPR := func(ctx context.Context, repo string, n int) (*Review, error) {
+		key := prKey(repo, n)
+		return runs.do(key, func() (*Review, error) {
+			log.Printf("reviewing %s ...", key)
+			start := time.Now()
+			rev, err := runReview(ctx, opts, repo, n)
+			if err != nil {
+				return nil, err
+			}
+			log.Printf("reviewed %s in %s (%s): %d comments", key, time.Since(start).Round(time.Second), rev.Context, len(rev.Comments))
+			st.put(key, rev)
+			return st.get(key), nil
+		})
+	}
+
+	if *watch > 0 && len(members) > 0 {
+		w := &watcher{every: *watch, since: time.Now().Add(-24 * time.Hour), repo: *repo, org: org, me: me, members: members,
+			review: reviewPR,
+			known:  func(key string) bool { return st.get(key) != nil || runs.isRunning(key) }}
+		go w.run(context.Background())
+		log.Printf("watching for new PRs by %s every %s", *team, *watch)
+	}
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
@@ -72,6 +98,12 @@ func main() {
 		for i := range prs {
 			prs[i].Mine = prs[i].Author == me
 			prs[i].Team = members[prs[i].Author]
+			key := prKey(prs[i].Repo, prs[i].Number)
+			if runs.isRunning(key) {
+				prs[i].Review = "running"
+			} else if rev := st.get(key); rev != nil {
+				prs[i].Review = rev.Verdict
+			}
 		}
 		reply(w, prs, err)
 	})
@@ -101,16 +133,12 @@ func main() {
 			reply(w, resp{cached, cached.HeadSHA != sha}, nil)
 			return
 		}
-		log.Printf("reviewing %s ...", key)
-		start := time.Now()
-		rev, err := runReview(ctx, opts, req.Repo, req.Number)
+		rev, err := reviewPR(ctx, req.Repo, req.Number)
 		if err != nil {
 			reply(w, nil, err)
 			return
 		}
-		log.Printf("reviewed %s in %s (%s): %d comments", key, time.Since(start).Round(time.Second), rev.Context, len(rev.Comments))
-		st.put(key, rev)
-		reply(w, resp{st.get(key), rev.HeadSHA != sha}, nil)
+		reply(w, resp{rev, rev.HeadSHA != sha}, nil)
 	})
 
 	// Post one comment right away.

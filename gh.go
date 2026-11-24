@@ -19,8 +19,9 @@ type PR struct {
 	CreatedAt time.Time `json:"createdAt"`
 	URL       string    `json:"url"`
 	IsDraft   bool      `json:"isDraft"`
-	Team      bool      `json:"team"` // author is in your team
-	Mine      bool      `json:"mine"` // author is you
+	Team      bool      `json:"team"`             // author is in your team
+	Mine      bool      `json:"mine"`             // author is you
+	Review    string    `json:"review,omitempty"` // "running", or the stored review's verdict
 }
 
 type PRDetails struct {
