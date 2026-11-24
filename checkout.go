@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -57,6 +59,37 @@ func git(ctx context.Context, dir string, args ...string) error {
 	return nil
 }
 
+const checkoutPrefix = "pr-reviewer-"
+
+// cleanStaleCheckouts removes worktrees in root left behind by a run that was
+// killed mid-review. Younger ones may belong to another running instance (a
+// review times out after 15 minutes), so only those older than minAge go.
+func cleanStaleCheckouts(root string, minAge time.Duration) {
+	dirs, _ := filepath.Glob(filepath.Join(root, checkoutPrefix+"*"))
+	for _, dir := range dirs {
+		fi, err := os.Stat(dir)
+		if err != nil || !fi.IsDir() || time.Since(fi.ModTime()) < minAge {
+			continue
+		}
+		// A worktree's .git file reads "gitdir: <clone>/.git/worktrees/<name>".
+		clone := ""
+		if b, err := os.ReadFile(filepath.Join(dir, ".git")); err == nil {
+			gitdir := strings.TrimSpace(strings.TrimPrefix(string(b), "gitdir:"))
+			if i := strings.Index(gitdir, "/.git/worktrees/"); i >= 0 {
+				clone = gitdir[:i]
+			}
+		}
+		if clone != "" {
+			git(context.Background(), clone, "worktree", "remove", "--force", dir)
+		}
+		os.RemoveAll(dir)
+		if clone != "" {
+			git(context.Background(), clone, "worktree", "prune")
+		}
+		log.Printf("removed stale checkout %s", dir)
+	}
+}
+
 // checkout creates a temporary detached worktree of the PR head in clone.
 // The caller must call cleanup, which removes the worktree again.
 func checkout(ctx context.Context, clone string, n int, sha string) (dir string, cleanup func(), err error) {
@@ -65,7 +98,7 @@ func checkout(ctx context.Context, clone string, n int, sha string) (dir string,
 			return "", nil, err
 		}
 	}
-	dir, err = os.MkdirTemp("", "pr-reviewer-")
+	dir, err = os.MkdirTemp("", checkoutPrefix)
 	if err != nil {
 		return "", nil, err
 	}

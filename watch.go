@@ -44,6 +44,18 @@ func (r *runner) do(key string, fn func() (*Review, error)) (*Review, error) {
 	return c.rev, c.err
 }
 
+// wait blocks until no review is running, or the timeout passes.
+func (r *runner) wait(timeout time.Duration) {
+	for end := time.Now().Add(timeout); time.Now().Before(end); time.Sleep(100 * time.Millisecond) {
+		r.mu.Lock()
+		n := len(r.running)
+		r.mu.Unlock()
+		if n == 0 {
+			return
+		}
+	}
+}
+
 func (r *runner) isRunning(key string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()

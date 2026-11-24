@@ -1,0 +1,10 @@
+# Live reload for development: `air`. Rebuilds on prompt.md, index.html and avatar.svg too (they are embedded).
+[build]
+cmd = "go build -o ./tmp/main ."
+bin = "./tmp/main"
+args_bin = ["-no-open", "-watch", "0"]
+include_ext = ["go", "html", "md", "svg"]
+exclude_dir = ["tmp"]
+# Interrupt instead of kill, so running reviews stop their claude process and remove their checkout.
+send_interrupt = true
+kill_delay = "8s"

@@ -13,12 +13,14 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -69,6 +71,12 @@ func main() {
 	}
 	cancel()
 
+	// Ctrl-C/SIGTERM cancel running reviews, so their claude process stops and
+	// their checkout is removed before the app exits.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	go cleanStaleCheckouts(os.TempDir(), 20*time.Minute)
+
 	st := loadStore(*storePath)
 	runs := &runner{running: map[string]*call{}}
 	// reviewPR runs a review (or waits for the one already running) and stores it.
@@ -91,7 +99,7 @@ func main() {
 		w := &watcher{every: *watch, since: time.Now().Add(-24 * time.Hour), repo: *repo, org: org, me: me, members: members,
 			review: reviewPR,
 			known:  func(key string) bool { return st.get(key) != nil || runs.isRunning(key) }}
-		go w.run(context.Background())
+		go w.run(ctx)
 		log.Printf("watching for new PRs by %s every %s", *team, *watch)
 	}
 
@@ -234,7 +242,18 @@ func main() {
 	if !*noOpen {
 		go openBrowser(u)
 	}
-	log.Fatal(http.ListenAndServe(*addr, guard(*addr, mux)))
+	srv := &http.Server{Addr: *addr, Handler: guard(*addr, mux), BaseContext: func(net.Listener) context.Context { return ctx }}
+	go func() {
+		<-ctx.Done()
+		sctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		srv.Shutdown(sctx)
+	}()
+	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		log.Fatal(err)
+	}
+	log.Print("shutting down, stopping running reviews ...")
+	runs.wait(10 * time.Second)
 }
 
 // guard blocks requests from other websites: DNS rebinding (foreign Host) and

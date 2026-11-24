@@ -12,6 +12,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"syscall"
+	"time"
 )
 
 type Comment struct {
@@ -47,11 +49,11 @@ type Review struct {
 }
 
 type Options struct {
-	Model      string
+	Model           string
 	Conventions     string // path of the conventions doc inside the PR's repo ("" = off)
 	ConventionsFile string // local fallback for it
-	PlainCC    bool   // plain "issue(blocking): subject" instead of badges
-	ClonesRoot string // directory holding local clones, for codebase access
+	PlainCC         bool   // plain "issue(blocking): subject" instead of badges
+	ClonesRoot      string // directory holding local clones, for codebase access
 }
 
 const reviewSchema = `{
@@ -234,6 +236,9 @@ func claude(ctx context.Context, o Options, dir string, tools bool, system, prom
 		args = append(args, "--tools", "")
 	}
 	cmd := exec.CommandContext(ctx, "claude", args...)
+	// On cancel (shutdown, timeout) let claude exit cleanly before it is killed.
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+	cmd.WaitDelay = 5 * time.Second
 	cmd.Dir = dir
 	cmd.Stdin = strings.NewReader(prompt)
 	var stderr bytes.Buffer

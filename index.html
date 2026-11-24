@@ -46,10 +46,19 @@
   .summary { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:12px 16px; margin:12px 0 20px; white-space:pre-wrap; }
   .verdict { font-weight:600; text-transform:uppercase; font-size:12px; }
   .verdict.approve { color:#3fb950; } .verdict.request_changes { color:#f85149; } .verdict.comment { color:#d29922; }
-  .comment { border:1px solid var(--border); border-left-width:4px; border-radius:8px; padding:10px 14px; margin-bottom:10px; cursor:pointer; background:var(--panel); }
-  .comment:hover { border-color:var(--muted); }
+  .comment { border:1px solid var(--border); border-left-width:4px; border-radius:8px; padding:10px 14px; margin-bottom:10px; background:var(--panel); }
   .comment.posting { opacity:.6; cursor:progress; }
-  .comment.posted { opacity:.55; cursor:default; }
+  .comment.posted { opacity:.55; }
+  .actions { display:flex; gap:6px; margin-top:8px; }
+  .actions button { font-size:12px; padding:2px 8px; }
+  textarea.edit { width:100%; min-height:120px; margin-top:6px; background:var(--bg); color:var(--fg); border:1px solid var(--accent); border-radius:6px; padding:8px; font:13px/1.45 ui-monospace, monospace; resize:vertical; }
+  .edited { color:var(--accent); font-size:11px; }
+  .submit { position:sticky; bottom:0; background:var(--bg); border-top:1px solid var(--border); padding:12px 0; margin-top:16px; display:grid; gap:8px; }
+  .submit textarea { width:100%; min-height:56px; background:var(--panel); color:var(--fg); border:1px solid var(--border); border-radius:6px; padding:8px; font:inherit; resize:vertical; }
+  .submit .row { display:flex; gap:8px; align-items:center; }
+  .submit select { background:var(--panel); color:var(--fg); border:1px solid var(--border); border-radius:6px; padding:4px 8px; font:inherit; }
+  .submit button.primary { background:#238636; border-color:#2ea043; color:#fff; }
+  .warn { color:#d29922; font-size:12px; margin-top:6px; }
   .comment.failed { border-color:#f85149; }
   .comment .top { display:flex; gap:8px; align-items:center; font-size:12px; margin-bottom:6px; }
   .sev { font-weight:700; text-transform:uppercase; }
@@ -167,10 +176,13 @@ async function review(pr, force = false) {
   if (rev.challenge) verdict.append(h('span', 'tag chal', rev.challenge));
   verdict.append(rerun);
   summary.append(verdict, document.createTextNode(rev.summary));
+  if (rev.outdated) summary.append(h('div', 'warn', 'New commits were pushed after this review. Line numbers may be off: re-run it before posting.'));
 
+  const selected = new Set(rev.comments.flatMap((c, i) => c.postedUrl ? [] : [i]));
   const comments = h('div');
-  comments.append(h('div', 'hint', `${rev.comments.length} suggested comments, sorted by severity and importance. Click one to post it to the PR.`));
-  rev.comments.forEach((c, i) => comments.append(commentCard(pr, rev, c, i)));
+  comments.append(h('div', 'hint', `${rev.comments.length} suggested comments, sorted by severity and importance. Edit them, post one now, or tick them and submit them together as one review.`));
+  const panel = submitPanel(pr, rev, selected);
+  rev.comments.forEach((c, i) => comments.append(commentCard(pr, rev, c, i, selected, panel.update)));
   if (rev.rejected?.length) {
     const rejected = h('details', 'rejected');
     rejected.append(h('summary', null, `${rev.rejected.length} finding(s) refuted by the challenger, not shown above`));
@@ -182,7 +194,7 @@ async function review(pr, force = false) {
     }
     comments.append(rejected);
   }
-  main.replaceChildren(head, summary, comments);
+  main.replaceChildren(head, summary, comments, panel.el);
 }
 
 // Readable preview of a comment; the posted body carries the extension's badge markdown.
@@ -199,37 +211,91 @@ function preview(c) {
   return el;
 }
 
-function commentCard(pr, rev, c, index) {
+function commentCard(pr, rev, c, index, selected, onSelect) {
   const el = h('div', 'comment ' + c.severity);
   const top = h('div', 'top');
-  const status = h('span', 'status', c.postedUrl ? '' : 'click to post');
-  top.append(h('span', 'sev', c.severity), h('span', null, `importance ${c.importance}/10`), h('span', 'loc', c.file ? `${c.file}:${c.line}` : 'general'), status);
-  el.append(top, preview(c));
+  const pick = h('input'); pick.type = 'checkbox'; pick.title = 'Include in the review';
+  pick.checked = selected.has(index); pick.disabled = !!c.postedUrl;
+  pick.onchange = () => { pick.checked ? selected.add(index) : selected.delete(index); onSelect(); };
+  const status = h('span', 'status');
+  top.append(pick, h('span', 'sev', c.severity), h('span', null, `importance ${c.importance}/10`), h('span', 'loc', c.file ? `${c.file}:${c.line}` : 'general'), status);
+
+  // After an edit, show the exact text that will be posted.
+  const view = h('div');
+  const showView = () => view.replaceChildren(c.edited ? h('div', 'body', c.body) : preview(c));
+  showView();
+  el.append(top, view);
   if (c.challenge) {
     const [outcome, ...why] = c.challenge.split(': ');
     el.append(h('div', 'challenge ' + outcome, `challenger ${outcome}: ${why.join(': ')}`));
   }
 
+  const actions = h('div', 'actions');
+  const editBtn = h('button', null, 'Edit');
+  const postBtn = h('button', null, 'Post now');
+  actions.append(editBtn, postBtn);
+  el.append(actions);
+
+  editBtn.onclick = () => {
+    if (editBtn.textContent === 'Done') { showView(); editBtn.textContent = 'Edit'; return; }
+    const ta = h('textarea', 'edit'); ta.value = c.body;
+    ta.oninput = () => { c.body = ta.value; c.edited = true; if (!status.textContent) status.append(h('span', 'edited', 'edited')); };
+    view.replaceChildren(ta); ta.focus();
+    editBtn.textContent = 'Done';
+  };
+
   const markPosted = () => {
-    el.classList.add('posted');
+    el.classList.add('posted'); actions.remove();
+    pick.checked = false; pick.disabled = true; selected.delete(index); onSelect();
     const link = h('a', null, '✓ posted'); link.href = c.postedUrl; link.target = '_blank';
     status.replaceChildren(link);
   };
   if (c.postedUrl) markPosted();
 
-  el.onclick = async (e) => {
-    if (e.target.tagName === 'A' || c.postedUrl || el.classList.contains('posting')) return;
-    if (window.getSelection().toString()) return; // don't post when selecting text
+  postBtn.onclick = async () => {
     el.classList.add('posting'); el.classList.remove('failed'); status.textContent = 'posting…';
     try {
-      const res = await api('/api/comment', { repo: pr.repo, number: pr.number, headSha: rev.headSha, file: c.file, line: c.line, body: c.body, index });
+      const res = await api('/api/comment', { repo: pr.repo, number: pr.number, body: c.body, index });
       c.postedUrl = res.url || pr.url;
       markPosted();
     } catch (err) {
-      el.classList.add('failed'); status.textContent = 'failed: ' + err.message + ' (click to retry)';
+      el.classList.add('failed'); status.textContent = 'failed: ' + err.message;
     } finally { el.classList.remove('posting'); }
   };
   return el;
+}
+
+// The panel that submits the ticked comments as one GitHub review with a verdict.
+function submitPanel(pr, rev, selected) {
+  const el = h('div', 'submit');
+  const body = h('textarea'); body.placeholder = 'Review summary (optional, posted as the review body)';
+  const event = h('select');
+  for (const [v, label] of [['COMMENT', 'Comment'], ['APPROVE', 'Approve'], ['REQUEST_CHANGES', 'Request changes']]) {
+    const o = h('option', null, label); o.value = v; event.append(o);
+  }
+  event.value = rev.verdict.toUpperCase();
+  const btn = h('button', 'primary');
+  const status = h('span', 'status');
+  const row = h('div', 'row'); row.append(event, btn, status);
+  el.append(body, row);
+
+  const update = () => { btn.textContent = `Submit review with ${selected.size} comment${selected.size === 1 ? '' : 's'}`; };
+  update();
+
+  btn.onclick = async () => {
+    if (event.value === 'REQUEST_CHANGES' && !body.value.trim() && !selected.size) {
+      status.textContent = 'Requesting changes needs a summary or at least one comment.'; return;
+    }
+    btn.disabled = true; status.textContent = 'submitting…';
+    try {
+      await api('/api/submit', { repo: pr.repo, number: pr.number, event: event.value, body: body.value,
+        comments: [...selected].map(i => ({ index: i, body: rev.comments[i].body })) });
+      review(pr); // reload from the store, which now marks them posted
+    } catch (err) {
+      status.textContent = 'failed: ' + err.message; btn.disabled = false;
+    }
+  };
+  return { el, update };
 }
 
 $('#refresh').onclick = () => { $('#q').value = ''; loadPRs(); };

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -291,5 +293,36 @@ func TestLoadConfig(t *testing.T) {
 	os.WriteFile(path, []byte("nope = 1\n"), 0o600)
 	if err := loadConfig(fs, path); err == nil || !strings.Contains(err.Error(), ":1:") {
 		t.Errorf("unknown flag should fail with a line number: %v", err)
+	}
+}
+
+func TestCleanStaleCheckouts(t *testing.T) {
+	ctx := context.Background()
+	clone, tmp := t.TempDir(), t.TempDir()
+	run := func(dir string, args ...string) {
+		t.Helper()
+		if err := git(ctx, dir, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run(clone, "init", "-q")
+	run(clone, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init")
+	stale, fresh := filepath.Join(tmp, checkoutPrefix+"old"), filepath.Join(tmp, checkoutPrefix+"new")
+	run(clone, "worktree", "add", "--detach", "-q", stale)
+	run(clone, "worktree", "add", "--detach", "-q", fresh)
+	old := time.Now().Add(-time.Hour)
+	os.Chtimes(stale, old, old)
+
+	cleanStaleCheckouts(tmp, 20*time.Minute)
+
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Errorf("stale checkout still there: %v", err)
+	}
+	if _, err := os.Stat(fresh); err != nil {
+		t.Errorf("fresh checkout removed: %v", err)
+	}
+	out, _ := exec.Command("git", "-C", clone, "worktree", "list").Output()
+	if strings.Contains(string(out), checkoutPrefix+"old") || !strings.Contains(string(out), checkoutPrefix+"new") {
+		t.Errorf("git still tracks the stale worktree or lost the fresh one:\n%s", out)
 	}
 }

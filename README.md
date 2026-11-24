@@ -2,8 +2,9 @@
 
 # pr-reviewer
 
-Local web app: list open PRs → click one → Claude reviews it → click a suggested
-[Conventional Comment](https://conventionalcomments.org) to post it on the PR.
+Local web app: list open PRs → click one → Claude reviews it → edit the suggested
+[Conventional Comments](https://conventionalcomments.org), then post them one by
+one or submit them together as a GitHub review with a verdict.
 
 Requires `gh` (authenticated) and `claude` on your PATH. No Go dependencies.
 
@@ -60,10 +61,18 @@ conventions-file = /path/to/local/frontend-conventions.md
   `pre-existing` are shown in the app but not posted.
 
 - Comments are sorted by severity (critical → info), then importance (10 → 1).
-- Comments with a file/line are posted as inline review comments on the PR head
-  commit. If GitHub rejects the line, it falls back to a normal PR comment
-  prefixed with `file:line`.
-- Reviews and posted state are cached in memory until restart. "Re-run review"
-  forces a fresh review.
+- **Posting:** nothing is posted until you click. **Edit** opens the exact text
+  that will be posted. **Post now** posts one comment. Tick comments and
+  **Submit review** to post them as one GitHub review (comment, approve or
+  request changes) with an optional summary.
+- Comments with a file/line go inline on the reviewed commit. If GitHub rejects
+  the line, a single comment falls back to a normal PR comment ending in
+  `file:line`. In a review it goes into the review body.
+- Reviews and posted state are saved to disk (`-store`). "Re-run review" forces a
+  fresh review. A warning shows when commits were pushed after the review.
+- **Stopping:** Ctrl-C stops running reviews cleanly, ending their `claude`
+  process and removing their checkout. Checkouts left behind by a hard kill
+  are removed at the next start, once they are 20 minutes old.
+- **Development:** `air` live-reloads with the included `.air.toml`.
 - The reviewer instructions live in `prompt.md` (embedded at build time). Edit and rebuild
   to tune the review style.
