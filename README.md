@@ -21,6 +21,13 @@ go build -o pr-reviewer . && ./pr-reviewer             # PRs where your review i
   to the review (falls back to `-skill-file`). Only important violations are
   flagged, tagged with the `conventions` decoration.
 
+- **Linked issues:** issues the PR closes (`Closes #123`) are loaded so the
+  reviewer can check the PR against their acceptance criteria.
+- **Challenger:** blocking, critical and high findings get a second, fresh
+  Claude pass that tries to refute them. Refuted findings are hidden (expand
+  "refuted by the challenger" to see them), unresolved ones become non-blocking,
+  and the verdict drops from request changes to comment if nothing blocks anymore.
+
 - Comments are sorted by severity (critical → info), then importance (10 → 1).
 - Comments with a file/line are posted as inline review comments on the PR head
   commit. If GitHub rejects the line, it falls back to a normal PR comment

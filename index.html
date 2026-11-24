@@ -23,6 +23,14 @@
   .tag.team { background:#1f6feb33; color:#58a6ff; border:1px solid #1f6feb; }
   .tag.you { background:#23863633; color:#3fb950; border:1px solid #238636; }
   .tag.conv { background:#8957e533; color:#bc8cff; border:1px solid #8957e5; }
+  .tag.chal { background:#d2992233; color:#e3b341; border:1px solid #9e6a03; }
+  .challenge { color:var(--muted); font-size:12px; margin-top:6px; }
+  .challenge.confirmed::before { content:'✓ '; color:#3fb950; }
+  .challenge.unresolved::before { content:'? '; color:#d29922; }
+  .challenge.refuted::before { content:'✗ '; color:#f85149; }
+  details.rejected { margin-top:20px; color:var(--muted); }
+  details.rejected summary { cursor:pointer; margin-bottom:8px; }
+  details.rejected .comment { opacity:.6; }
   .search { padding:10px 16px; border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:6px; }
   .search input[type=search] { width:100%; background:var(--panel); color:var(--fg); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font:inherit; }
   .search input[type=search]:focus { outline:none; border-color:var(--accent); }
@@ -138,12 +146,24 @@ async function review(pr, force = false) {
   const summary = h('div', 'summary');
   const verdict = h('div', 'verdict ' + rev.verdict, rev.verdict.replace('_', ' '));
   if (rev.conventions) verdict.append(h('span', 'tag conv', rev.conventions));
+  if (rev.challenge) verdict.append(h('span', 'tag chal', rev.challenge));
   verdict.append(rerun);
   summary.append(verdict, document.createTextNode(rev.summary));
 
   const comments = h('div');
   comments.append(h('div', 'hint', `${rev.comments.length} suggested comments, sorted by severity and importance. Click one to post it to the PR.`));
   rev.comments.forEach((c, i) => comments.append(commentCard(pr, rev, c, i)));
+  if (rev.rejected?.length) {
+    const rejected = h('details', 'rejected');
+    rejected.append(h('summary', null, `${rev.rejected.length} finding(s) refuted by the challenger, not shown above`));
+    for (const c of rev.rejected) {
+      const el = h('div', 'comment ' + c.severity);
+      el.style.cursor = 'default';
+      el.append(h('div', 'loc', c.file ? `${c.file}:${c.line}` : 'general'), h('div', 'body', c.body), h('div', 'challenge refuted', c.challenge.replace(/^refuted: /, '')));
+      rejected.append(el);
+    }
+    comments.append(rejected);
+  }
   main.replaceChildren(head, summary, comments);
 }
 
@@ -153,6 +173,10 @@ function commentCard(pr, rev, c, index) {
   const status = h('span', 'status', c.postedUrl ? '' : 'click to post');
   top.append(h('span', 'sev', c.severity), h('span', null, `importance ${c.importance}/10`), h('span', 'loc', c.file ? `${c.file}:${c.line}` : 'general'), status);
   el.append(top, h('div', 'body', c.body));
+  if (c.challenge) {
+    const [outcome, ...why] = c.challenge.split(': ');
+    el.append(h('div', 'challenge ' + outcome, `challenger ${outcome}: ${why.join(': ')}`));
+  }
 
   const markPosted = () => {
     el.classList.add('posted');
