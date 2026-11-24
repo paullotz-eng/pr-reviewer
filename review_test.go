@@ -326,3 +326,16 @@ func TestCleanStaleCheckouts(t *testing.T) {
 		t.Errorf("git still tracks the stale worktree or lost the fresh one:\n%s", out)
 	}
 }
+
+func TestMergePRs(t *testing.T) {
+	now := time.Now()
+	a := []PR{{Repo: "o/r", Number: 1, CreatedAt: now.Add(-time.Hour)}, {Repo: "o/r", Number: 2, CreatedAt: now}}
+	b := []PR{{Repo: "o/r", Number: 2, CreatedAt: now, Team: true}, {Repo: "o/x", Number: 1, CreatedAt: now.Add(-2 * time.Hour)}}
+	var got []string
+	for _, pr := range mergePRs(a, b) {
+		got = append(got, prKey(pr.Repo, pr.Number))
+	}
+	if !slices.Equal(got, []string{"o/r#2", "o/r#1", "o/x#1"}) {
+		t.Errorf("merged = %v", got)
+	}
+}

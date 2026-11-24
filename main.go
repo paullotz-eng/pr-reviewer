@@ -118,7 +118,16 @@ func main() {
 	mux.HandleFunc("GET /api/prs", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 		defer cancel()
-		prs, err := listPRs(ctx, *repo, org, strings.TrimSpace(r.URL.Query().Get("q")), *limit)
+		q := strings.TrimSpace(r.URL.Query().Get("q"))
+		prs, err := listPRs(ctx, *repo, org, q, *limit)
+		// Team PRs rarely request your review directly (they ask a team, or
+		// you already reviewed), so add them to the default list.
+		if err == nil && q == "" && len(members) > 0 {
+			var team []PR
+			if team, err = teamPRs(ctx, *repo, org, members); err == nil {
+				prs = mergePRs(prs, team)
+			}
+		}
 		for i := range prs {
 			prs[i].Mine = prs[i].Author == me
 			prs[i].Team = members[prs[i].Author]

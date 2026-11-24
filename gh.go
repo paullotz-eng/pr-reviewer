@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -95,6 +97,69 @@ func listPRs(ctx context.Context, repo, org, query string, limit int) ([]PR, err
 		prs[i] = PR{Repo: r.Repository.NameWithOwner, Number: r.Number, Title: r.Title, Author: r.Author.Login, CreatedAt: r.CreatedAt, URL: r.URL, IsDraft: r.IsDraft}
 	}
 	return prs, nil
+}
+
+// teamPRs returns open, non-draft PRs by members, within repo or else org.
+// It uses the search API directly: there, repeated author: qualifiers are ORed,
+// which `gh search prs` does not support. Queries are capped at 256 characters,
+// so large teams are split over several searches.
+func teamPRs(ctx context.Context, repo, org string, members map[string]bool) ([]PR, error) {
+	base := "is:pr is:open draft:false org:" + org
+	if repo != "" {
+		base = "is:pr is:open draft:false repo:" + repo
+	}
+	logins := slices.Sorted(maps.Keys(members))
+	var prs []PR
+	for len(logins) > 0 {
+		q := base
+		for len(logins) > 0 && len(q)+len(" author:")+len(logins[0]) <= 256 {
+			q += " author:" + logins[0]
+			logins = logins[1:]
+		}
+		if q == base { // a single login that doesn't fit; skip it
+			logins = logins[1:]
+			continue
+		}
+		out, err := gh(ctx, nil, "api", "-X", "GET", "search/issues", "-f", "q="+q, "-f", "sort=created", "-f", "order=desc", "-f", "per_page=100")
+		if err != nil {
+			return nil, err
+		}
+		var res struct {
+			Items []struct {
+				Number        int       `json:"number"`
+				Title         string    `json:"title"`
+				CreatedAt     time.Time `json:"created_at"`
+				HTMLURL       string    `json:"html_url"`
+				Draft         bool      `json:"draft"`
+				RepositoryURL string    `json:"repository_url"`
+				User          struct{ Login string }
+			}
+		}
+		if err := json.Unmarshal(out, &res); err != nil {
+			return nil, err
+		}
+		for _, it := range res.Items {
+			_, name, _ := strings.Cut(it.RepositoryURL, "/repos/")
+			prs = append(prs, PR{Repo: name, Number: it.Number, Title: it.Title, Author: it.User.Login, CreatedAt: it.CreatedAt, URL: it.HTMLURL, IsDraft: it.Draft})
+		}
+	}
+	return prs, nil
+}
+
+// mergePRs combines PR lists without duplicates, newest first.
+func mergePRs(lists ...[]PR) []PR {
+	seen := map[string]bool{}
+	var all []PR
+	for _, l := range lists {
+		for _, pr := range l {
+			if k := prKey(pr.Repo, pr.Number); !seen[k] {
+				seen[k] = true
+				all = append(all, pr)
+			}
+		}
+	}
+	slices.SortStableFunc(all, func(a, b PR) int { return b.CreatedAt.Compare(a.CreatedAt) })
+	return all
 }
 
 // teamMembers returns the logins of an "org/team-slug" GitHub team.

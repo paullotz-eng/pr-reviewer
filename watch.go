@@ -93,8 +93,7 @@ func (w *watcher) run(ctx context.Context) {
 
 func (w *watcher) poll(ctx context.Context) {
 	lctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	// draft:false makes it a search: within -repo, or across the team's org.
-	prs, err := listPRs(lctx, w.repo, w.org, "draft:false", 50)
+	prs, err := teamPRs(lctx, w.repo, w.org, w.members)
 	cancel()
 	if err != nil {
 		log.Printf("watch: %v", err)
