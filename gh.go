@@ -227,12 +227,13 @@ func htmlURL(out []byte) string {
 	return res.HTMLURL
 }
 
-// locate prefixes a comment that can't be posted inline with its location.
+// locate appends the location to a comment that can't be posted inline. It goes
+// at the end so the comment still starts with its Conventional Comments prefix.
 func locate(file string, line int, body string) string {
 	if file == "" {
 		return body
 	}
-	return fmt.Sprintf("`%s:%d`\n\n%s", file, line, body)
+	return fmt.Sprintf("%s\n\n`%s:%d`", body, file, line)
 }
 
 // postComment posts a single comment: inline when the line is in the diff,

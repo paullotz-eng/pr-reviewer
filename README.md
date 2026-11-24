@@ -19,7 +19,7 @@ go build -o pr-reviewer . && ./pr-reviewer             # PRs where your review i
 - **React conventions:** if a PR touches `.tsx`/`.jsx`/`use-*.ts`, the
   `.claude/skills/react-conventions/SKILL.md` from the PR's base branch is added
   to the review (falls back to `-skill-file`). Only important violations are
-  flagged, tagged with the `conventions` decoration.
+  flagged, tagged with the `conventions` topic.
 
 - **Linked issues:** issues the PR closes (`Closes #123`) are loaded so the
   reviewer can check the PR against their acceptance criteria.
@@ -34,6 +34,13 @@ go build -o pr-reviewer . && ./pr-reviewer             # PRs where your review i
   Claude pass that tries to refute them. Refuted findings are hidden (expand
   "refuted by the challenger" to see them), unresolved ones become non-blocking,
   and the verdict drops from request changes to comment if nothing blocks anymore.
+
+- **Comment format:** matches the [Pullpo Conventional Comments extension](https://github.com/pullpo-io/conventional-comments)
+  the team uses, so posted comments look the same as hand-written ones and the
+  extension recognises them: its badge style by default, or
+  `issue(blocking): subject` with `-cc-style plain`. One decoration per comment
+  (`blocking`, `non-blocking`, `if-minor`); topics such as `security` or
+  `pre-existing` are shown in the app but not posted.
 
 - Comments are sorted by severity (critical → info), then importance (10 → 1).
 - Comments with a file/line are posted as inline review comments on the PR head

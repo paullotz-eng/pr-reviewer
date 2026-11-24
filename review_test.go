@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -132,9 +133,9 @@ func TestGuard(t *testing.T) {
 
 func TestApplyChallenge(t *testing.T) {
 	r := &Review{Verdict: "request_changes", Comments: []Comment{
-		{Subject: "a", Severity: "high", Decorations: []string{"blocking"}},
-		{Subject: "b", Severity: "medium", Decorations: []string{"blocking"}},
-		{Subject: "c", Severity: "critical", Decorations: []string{"non-blocking"}},
+		{Subject: "a", Severity: "high", Decoration: "blocking"},
+		{Subject: "b", Severity: "medium", Decoration: "blocking"},
+		{Subject: "c", Severity: "critical", Decoration: "non-blocking"},
 		{Subject: "d", Severity: "low"},
 	}}
 	applyChallenge(r, []challengeResult{
@@ -154,8 +155,8 @@ func TestApplyChallenge(t *testing.T) {
 	if len(r.Rejected) != 1 || r.Rejected[0].Subject != "a" || r.Rejected[0].Challenge != "refuted: guarded in caller" {
 		t.Errorf("rejected = %+v", r.Rejected)
 	}
-	if !slices.Equal(r.Comments[0].Decorations, []string{"non-blocking"}) {
-		t.Errorf("unresolved finding should be non-blocking: %v", r.Comments[0].Decorations)
+	if r.Comments[0].Decoration != "non-blocking" {
+		t.Errorf("unresolved finding should be non-blocking: %v", r.Comments[0].Decoration)
 	}
 	if r.Comments[2].Challenge != "" {
 		t.Errorf("unchallenged finding got a challenge note")
@@ -208,5 +209,40 @@ func TestRunnerDedupes(t *testing.T) {
 	a, b := <-done, <-done
 	if calls != 1 || a != b || a.Verdict != "approve" {
 		t.Errorf("calls = %d, results %v %v", calls, a, b)
+	}
+}
+
+// Regexes from the Pullpo Conventional Comments extension (src/content/badges.js):
+// it uses them to recognise a comment's prefix.
+var (
+	pullpoPlain = regexp.MustCompile(`^\s*(?:(praise|nitpick|suggestion|issue|question|thought|chore|todo)\s*(?:\((non-blocking|blocking|if-minor)\))?:)\s*`)
+	pullpoBadge = regexp.MustCompile(`^\s*\[\!\[(?:(praise|nitpick|suggestion|issue|question|thought|chore|todo)(?:\((non-blocking|blocking|if-minor)\))?)\]\(https?:\/\/img\.shields\.io\/badge\/.*?\)\]\(https?:\/\/pullpo\.io\/cc\?.*?\)\s*`)
+)
+
+func TestRenderCommentMatchesPullpo(t *testing.T) {
+	c := Comment{Label: "issue", Decoration: "non-blocking", Topics: []string{"security"}, Subject: "`user` can be null", Discussion: "Return 404."}
+
+	got := renderComment(c, false)
+	want := "[![issue(non-blocking)](https://img.shields.io/badge/issue-non--blocking-9CA3AF?labelColor=EF4444)](https://pullpo.io/cc?l=issue&d=non-blocking) \n`user` can be null\n\nReturn 404."
+	if got != want {
+		t.Errorf("badge:\n got %q\nwant %q", got, want)
+	}
+	if m := pullpoBadge.FindStringSubmatch(got); m == nil || m[1] != "issue" || m[2] != "non-blocking" {
+		t.Errorf("extension would not recognise badge prefix: %v", m)
+	}
+
+	got = renderComment(c, true)
+	if got != "issue(non-blocking): `user` can be null\n\nReturn 404." {
+		t.Errorf("plain: %q", got)
+	}
+	if m := pullpoPlain.FindStringSubmatch(got); m == nil || m[1] != "issue" || m[2] != "non-blocking" {
+		t.Errorf("extension would not recognise plain prefix: %v", m)
+	}
+
+	if got := badge("todo", ""); got != "[![todo](https://img.shields.io/badge/todo-E879F9)](https://pullpo.io/cc?l=todo) " {
+		t.Errorf("badge without decoration: %q", got)
+	}
+	if got := locate("a.go", 3, "issue(blocking): x"); !pullpoPlain.MatchString(got) {
+		t.Errorf("location must not precede the prefix: %q", got)
 	}
 }

@@ -38,9 +38,13 @@ func main() {
 		"local react-conventions skill, used if the PR's repo has none")
 	storePath := flag.String("store", filepath.Join(cacheDir, "pr-reviewer", "reviews.json"), "file that keeps reviews across restarts")
 	noOpen := flag.Bool("no-open", false, "don't open the browser")
+	ccStyle := flag.String("cc-style", "badge", `comment prefix like the Pullpo Conventional Comments extension: "badge" (its default) or "plain"`)
 	watch := flag.Duration("watch", 10*time.Minute, "how often to check for new PRs by -team members and review them automatically (0 disables)")
 	flag.Parse()
-	opts := Options{Model: *model, SkillFile: *skillFile, ClonesRoot: *clonesRoot}
+	if *ccStyle != "badge" && *ccStyle != "plain" {
+		log.Fatalf("-cc-style must be badge or plain, got %q", *ccStyle)
+	}
+	opts := Options{Model: *model, SkillFile: *skillFile, ClonesRoot: *clonesRoot, PlainCC: *ccStyle == "plain"}
 
 	startCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	me, err := currentUser(startCtx)

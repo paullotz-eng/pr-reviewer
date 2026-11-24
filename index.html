@@ -56,6 +56,10 @@
   .loc { font-family:ui-monospace, monospace; color:var(--muted); }
   .status { margin-left:auto; color:var(--muted); }
   .status a { color:#3fb950; }
+  .cc { display:inline-block; border-radius:4px; padding:0 6px; font-size:12px; font-weight:600; color:#fff; margin-right:6px; }
+  .cc .dec { opacity:.85; font-weight:400; }
+  .topic { color:var(--muted); font-size:11px; border:1px solid var(--border); border-radius:10px; padding:0 6px; margin-right:4px; }
+  .subject { font-weight:600; }
   .body { white-space:pre-wrap; font-family:ui-monospace, monospace; font-size:13px; }
   .hint { color:var(--muted); font-size:12px; margin-bottom:8px; }
   .spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; vertical-align:middle; margin-right:8px; }
@@ -162,7 +166,7 @@ async function review(pr, force = false) {
     for (const c of rev.rejected) {
       const el = h('div', 'comment ' + c.severity);
       el.style.cursor = 'default';
-      el.append(h('div', 'loc', c.file ? `${c.file}:${c.line}` : 'general'), h('div', 'body', c.body), h('div', 'challenge refuted', c.challenge.replace(/^refuted: /, '')));
+      el.append(h('div', 'loc', c.file ? `${c.file}:${c.line}` : 'general'), preview(c), h('div', 'challenge refuted', c.challenge.replace(/^refuted: /, '')));
       rejected.append(el);
     }
     comments.append(rejected);
@@ -170,12 +174,26 @@ async function review(pr, force = false) {
   main.replaceChildren(head, summary, comments);
 }
 
+// Readable preview of a comment; the posted body carries the extension's badge markdown.
+const LABEL_COLORS = { praise: '28A745', nitpick: 'F59E0B', suggestion: '3B82F6', todo: 'E879F9', issue: 'EF4444', question: '8B5CF6', thought: '6B7280', chore: 'F97316' };
+function preview(c) {
+  if (!c.decoration) return h('div', 'body', c.body); // reviews stored before the Pullpo format
+  const el = h('div');
+  const cc = h('span', 'cc', c.label + ' ');
+  cc.style.background = '#' + (LABEL_COLORS[c.label] || '6B7280');
+  cc.append(h('span', 'dec', c.decoration));
+  el.append(cc, h('span', 'subject', c.subject));
+  for (const t of c.topics || []) el.append(h('span', 'topic', t));
+  if (c.discussion) el.append(h('div', 'body', c.discussion));
+  return el;
+}
+
 function commentCard(pr, rev, c, index) {
   const el = h('div', 'comment ' + c.severity);
   const top = h('div', 'top');
   const status = h('span', 'status', c.postedUrl ? '' : 'click to post');
   top.append(h('span', 'sev', c.severity), h('span', null, `importance ${c.importance}/10`), h('span', 'loc', c.file ? `${c.file}:${c.line}` : 'general'), status);
-  el.append(top, h('div', 'body', c.body));
+  el.append(top, preview(c));
   if (c.challenge) {
     const [outcome, ...why] = c.challenge.split(': ');
     el.append(h('div', 'challenge ' + outcome, `challenger ${outcome}: ${why.join(': ')}`));
