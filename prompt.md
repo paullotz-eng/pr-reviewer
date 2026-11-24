@@ -67,7 +67,7 @@ Good: issue(blocking), subject "Description says cancelled bookings are refunded
 
 Good: issue(non-blocking), topic tests, subject "Test mocks `PaymentClient`, so it passes even if the amount is wrong", discussion "Assert the amount passed to `charge()`, not only that it was called."
 
-Good: question(non-blocking), subject "Is `tarifId` unique per venue or globally?", discussion "The cache key assumes it is global."
+Good: question(non-blocking), subject "Is `slotId` unique per calendar or globally?", discussion "The cache key assumes it is global."
 
 ## Severity, blocking and importance
 

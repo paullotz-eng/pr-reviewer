@@ -35,19 +35,23 @@ func main() {
 	repo := flag.String("repo", "", "owner/name to list PRs from (default: PRs where your review is requested)")
 	limit := flag.Int("limit", 30, "number of PRs to list")
 	model := flag.String("model", "", "claude model to review with (default: claude CLI default)")
-	team := flag.String("team", "eversport/team-ball-racket-sports", "org/team-slug whose PRs get a team tag (\"\" to disable)")
+	team := flag.String("team", "", "org/team-slug whose PRs get a team tag and are reviewed automatically")
 	clonesRoot := flag.String("clones", filepath.Join(home, "Code"), "directory with local clones; a matching clone gives the reviewer codebase access")
-	skillFile := flag.String("skill-file", filepath.Join(home, "Code/eversports", conventionsSkill),
-		"local react-conventions skill, used if the PR's repo has none")
+	conventions := flag.String("conventions", "", "path, inside the PR's repo, of a frontend conventions doc to check frontend PRs against")
+	conventionsFile := flag.String("conventions-file", "", "local conventions doc, used if the PR's repo has none at -conventions")
 	storePath := flag.String("store", filepath.Join(cacheDir, "pr-reviewer", "reviews.json"), "file that keeps reviews across restarts")
 	noOpen := flag.Bool("no-open", false, "don't open the browser")
 	ccStyle := flag.String("cc-style", "badge", `comment prefix like the Pullpo Conventional Comments extension: "badge" (its default) or "plain"`)
 	watch := flag.Duration("watch", 10*time.Minute, "how often to check for new PRs by -team members and review them automatically (0 disables)")
+	cfg := configPath()
+	if err := loadConfig(flag.CommandLine, cfg); err != nil {
+		log.Fatal(err)
+	}
 	flag.Parse()
 	if *ccStyle != "badge" && *ccStyle != "plain" {
 		log.Fatalf("-cc-style must be badge or plain, got %q", *ccStyle)
 	}
-	opts := Options{Model: *model, SkillFile: *skillFile, ClonesRoot: *clonesRoot, PlainCC: *ccStyle == "plain"}
+	opts := Options{Model: *model, Conventions: *conventions, ConventionsFile: *conventionsFile, ClonesRoot: *clonesRoot, PlainCC: *ccStyle == "plain"}
 
 	startCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	me, err := currentUser(startCtx)
@@ -341,6 +345,43 @@ func reply(w http.ResponseWriter, v any, err error) {
 		v = map[string]string{"error": err.Error()}
 	}
 	json.NewEncoder(w).Encode(v)
+}
+
+// configPath is $XDG_CONFIG_HOME/pr-reviewer/config, or ~/.config/pr-reviewer/config.
+func configPath() string {
+	dir := os.Getenv("XDG_CONFIG_HOME")
+	if dir == "" {
+		home, _ := os.UserHomeDir()
+		dir = filepath.Join(home, ".config")
+	}
+	return filepath.Join(dir, "pr-reviewer", "config")
+}
+
+// loadConfig sets flag defaults from "name = value" lines (# starts a comment),
+// so team-specific settings stay out of the code. Command-line flags still win.
+func loadConfig(fs *flag.FlagSet, path string) error {
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for i, line := range strings.Split(string(b), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		name, value, ok := strings.Cut(line, "=")
+		if !ok {
+			return fmt.Errorf("%s:%d: want name = value", path, i+1)
+		}
+		if err := fs.Set(strings.TrimSpace(name), strings.TrimSpace(value)); err != nil {
+			return fmt.Errorf("%s:%d: %v", path, i+1, err)
+		}
+	}
+	log.Printf("config: %s", path)
+	return nil
 }
 
 func openBrowser(url string) {

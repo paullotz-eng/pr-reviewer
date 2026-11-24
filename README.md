@@ -7,18 +7,33 @@ Requires `gh` (authenticated) and `claude` on your PATH. No Go dependencies.
 
 ```sh
 go build -o pr-reviewer . && ./pr-reviewer             # PRs where your review is requested
-./pr-reviewer -repo eversport/eversports               # newest open PRs in one repo
+./pr-reviewer -repo acme/shop                          # newest open PRs in one repo
 ./pr-reviewer -model opus -limit 50 -addr 127.0.0.1:7777 -no-open
-./pr-reviewer -team eversport/guild-react                # tag a different team's PRs
+./pr-reviewer -team acme/web-team                       # tag and auto-review a team's PRs
+./pr-reviewer -h                                        # all flags
+```
+
+### Config file
+
+Any flag can be set in `~/.config/pr-reviewer/config` (or under
+`$XDG_CONFIG_HOME`), one `name = value` per line. Flags on the command line win.
+Keep team-specific settings here rather than in the code:
+
+```ini
+# ~/.config/pr-reviewer/config
+team = acme/web-team
+repo = acme/shop
+conventions = docs/frontend-conventions.md
+conventions-file = /path/to/local/frontend-conventions.md
 ```
 
 - **Search:** typing filters the list (title, author, repo, number). Enter runs a
   GitHub search within `-repo`, or the team's org. Qualifiers like `author:x` work.
 - **Team tags:** PRs by members of `-team` get a `team` tag, yours get `you`.
   "Only my team" hides the rest.
-- **React conventions:** if a PR touches `.tsx`/`.jsx`/`use-*.ts`, the
-  `.claude/skills/react-conventions/SKILL.md` from the PR's base branch is added
-  to the review (falls back to `-skill-file`). Only important violations are
+- **Frontend conventions:** with `-conventions <path>`, if a PR touches
+  `.tsx`/`.jsx`/`use-*.ts`, that file from the PR's base branch is added to the
+  review (falls back to `-conventions-file`). Only important violations are
   flagged, tagged with the `conventions` topic.
 
 - **Linked issues:** issues the PR closes (`Closes #123`) are loaded so the

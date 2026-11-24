@@ -1,8 +1,11 @@
 package main
 
 import (
+	"flag"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -90,12 +93,12 @@ func TestIsFrontend(t *testing.T) {
 }
 
 func TestRemoteMatches(t *testing.T) {
-	for _, u := range []string{"git@github.com:eversport/eversports.git", "https://github.com/Eversport/Eversports"} {
-		if !remoteMatches(u, "eversport/eversports") {
+	for _, u := range []string{"git@github.com:acme/shop.git", "https://github.com/Acme/Shop"} {
+		if !remoteMatches(u, "acme/shop") {
 			t.Errorf("%s should match", u)
 		}
 	}
-	if remoteMatches("git@github.com:other/eversports.git", "eversport/eversports") {
+	if remoteMatches("git@github.com:other/shop.git", "acme/shop") {
 		t.Error("other owner should not match")
 	}
 }
@@ -266,5 +269,27 @@ func TestReviewStatus(t *testing.T) {
 		if text, kind := reviewStatus(c.rev, c.running); text != c.text || kind != c.wantKind {
 			t.Errorf("%s: got %q/%q, want %q/%q", c.name, text, kind, c.text, c.wantKind)
 		}
+	}
+}
+
+func TestLoadConfig(t *testing.T) {
+	fs := flag.NewFlagSet("t", flag.ContinueOnError)
+	team := fs.String("team", "", "")
+	watch := fs.Duration("watch", time.Minute, "")
+	path := filepath.Join(t.TempDir(), "config")
+	os.WriteFile(path, []byte("# work\nteam = acme/web\n\nwatch=10m\n"), 0o600)
+	if err := loadConfig(fs, path); err != nil {
+		t.Fatal(err)
+	}
+	fs.Parse([]string{"-team", "acme/api"})
+	if *team != "acme/api" || *watch != 10*time.Minute {
+		t.Errorf("team=%q watch=%s: command line should win, config should fill the rest", *team, *watch)
+	}
+	if err := loadConfig(fs, filepath.Join(t.TempDir(), "missing")); err != nil {
+		t.Errorf("missing config should be fine: %v", err)
+	}
+	os.WriteFile(path, []byte("nope = 1\n"), 0o600)
+	if err := loadConfig(fs, path); err == nil || !strings.Contains(err.Error(), ":1:") {
+		t.Errorf("unknown flag should fail with a line number: %v", err)
 	}
 }
