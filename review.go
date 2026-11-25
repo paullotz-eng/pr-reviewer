@@ -34,6 +34,7 @@ type Comment struct {
 }
 
 type Review struct {
+	Overview string    `json:"overview"` // what the PR changes and why, for the reader
 	Summary  string    `json:"summary"`
 	Verdict  string    `json:"verdict"`
 	Comments []Comment `json:"comments"`
@@ -59,8 +60,9 @@ type Options struct {
 
 const reviewSchema = `{
   "type": "object",
-  "required": ["summary", "verdict", "comments"],
+  "required": ["overview", "summary", "verdict", "comments"],
   "properties": {
+    "overview": {"type": "string"},
     "summary": {"type": "string"},
     "verdict": {"type": "string", "enum": ["approve", "comment", "request_changes"]},
     "comments": {"type": "array", "items": {

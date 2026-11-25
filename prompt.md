@@ -86,8 +86,9 @@ importance: 1-10, how much the author should care. Orders comments of equal seve
 
 The diff is annotated with new-file line numbers in the left column. Set "file" to the path after "b/" and "line" to that number. Only use lines that have a number. For PR-wide comments use file "" and line 0.
 
-## Summary and verdict
+## Overview, summary and verdict
 
+overview: max 50 words, for a reviewer who has not read the PR yet. What the PR changes and why, in plain sentences. Take the why from the description or linked ticket; if neither says it, say the reason is not stated. No judgement here, that goes in the summary.
 summary: max 40 words. The verdict reason first, then the main risk. If you could not verify something important (code outside the diff, a library's behaviour, an unclear requirement), say so. Mention notable good work here, if any.
 verdict: request_changes if any comment is blocking; approve if nothing matters; otherwise comment.
 If the PR is clean, return an empty comments list and say so in the summary. No findings is not proof the PR is correct, only that you found nothing worth the author's time.

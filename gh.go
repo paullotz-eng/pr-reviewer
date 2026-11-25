@@ -306,7 +306,7 @@ func locate(file string, line int, body string) string {
 
 // signature closes every comment posted to GitHub, so readers can tell it came
 // from this tool. Added at posting time, so it never shows up in the editor.
-const signature = `<sub><a href="https://github.com/paullotz-eng/pr-reviewer"><img src="https://raw.githubusercontent.com/paullotz-eng/pr-reviewer/main/avatar.svg" width="16" height="16" align="absmiddle" alt="owl"></a> Posted with [pr-reviewer](https://github.com/paullotz-eng/pr-reviewer)</sub>`
+const signature = `<sub><a href="https://github.com/paullotz-eng/pr-reviewer"><img src="https://raw.githubusercontent.com/paullotz-eng/pr-reviewer/main/avatar.svg" width="16" height="16" align="absmiddle" alt="pr-reviewer"></a></sub>`
 
 func sign(body string) string { return body + "\n\n" + signature }
 
